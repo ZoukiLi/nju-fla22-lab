@@ -1,0 +1,23 @@
+[[state]]
+name = 'A'
+is_start = true
+
+[[state.transitions]]
+next = 'B'
+consume = 'b'
+produce = ' '
+move = 'Left'
+
+[[state.transitions]]
+next = 'C'
+consume = '*'
+produce = '*'
+move = 'Stay'
+
+[[state]]
+name = 'B'
+is_final = false
+
+[[state]]
+name = 'C'
+is_final = true
