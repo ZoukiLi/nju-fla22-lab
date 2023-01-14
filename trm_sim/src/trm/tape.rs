@@ -1,11 +1,9 @@
 //! this module contains the tape struct and its methods
 
-
 use std::collections::VecDeque;
 
 /// a tape is a vector of symbols with a head
 /// that can move left and right
-/// the head is *always* on a symbol
 /// the tape is infinite in both directions
 
 #[derive(Debug, Clone)]

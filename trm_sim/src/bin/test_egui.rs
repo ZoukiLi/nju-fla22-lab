@@ -4,10 +4,10 @@
 
 #[cfg(feature = "egui_use")]
 mod egui_test {
-    use eframe::{self, egui, Frame};
     use eframe::egui::Context;
+    use eframe::{self, egui, Frame};
 
-    struct TestApp {
+    pub struct TestApp {
         name: String,
         age: u32,
     }
@@ -34,17 +34,18 @@ mod egui_test {
             });
         }
     }
+}
 
-    fn main() {
-        let options = eframe::NativeOptions::default();
-        eframe::run_native(
-            "Hello egui",
-            options,
-            Box::new(|_cc|
-                Box::<TestApp>::default()
-            )
-        )
-    }
+#[cfg(feature = "egui_use")]
+fn main() {
+    use egui_test::TestApp;
+
+    let options = eframe::NativeOptions::default();
+    eframe::run_native(
+        "Hello egui",
+        options,
+        Box::new(|_cc| Box::<TestApp>::default()),
+    )
 }
 
 #[cfg(not(feature = "egui_use"))]

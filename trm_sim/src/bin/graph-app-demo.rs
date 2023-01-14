@@ -8,7 +8,7 @@ mod egui_node_graph {
 
     use egui_node_graph::*;
 
-// ========= First, define your user data types =============
+    // ========= First, define your user data types =============
 
     /// The NodeData holds a custom data struct inside each node. It's useful to
     /// store additional information that doesn't live in parameters. For this
@@ -104,7 +104,7 @@ mod egui_node_graph {
         pub active_node: Option<NodeId>,
     }
 
-// =========== Then, you need to implement some traits ============
+    // =========== Then, you need to implement some traits ============
 
     // A trait for the data types, to tell the library how to display them
     impl DataTypeTrait<MyGraphState> for MyDataType {
@@ -124,7 +124,7 @@ mod egui_node_graph {
     }
 
     // A trait for the node kinds, which tells the library how to build new nodes
-// from the templates in the node finder
+    // from the templates in the node finder
     impl NodeTemplateTrait for MyNodeTemplate {
         type NodeData = MyNodeData;
         type DataType = MyDataType;
@@ -326,8 +326,8 @@ mod egui_node_graph {
             _graph: &Graph<MyNodeData, MyDataType, MyValueType>,
             user_state: &mut Self::UserState,
         ) -> Vec<NodeResponse<MyResponse, MyNodeData>>
-            where
-                MyResponse: UserResponseTrait,
+        where
+            MyResponse: UserResponseTrait,
         {
             // This logic is entirely up to the user. In this case, we check if the
             // current node we're drawing is the active one, by comparing against
@@ -363,7 +363,7 @@ mod egui_node_graph {
 
     type MyGraph = Graph<MyNodeData, MyDataType, MyValueType>;
     type MyEditorState =
-    GraphEditorState<MyNodeData, MyDataType, MyValueType, MyNodeTemplate, MyGraphState>;
+        GraphEditorState<MyNodeData, MyDataType, MyValueType, MyNodeTemplate, MyGraphState>;
 
     #[derive(Default)]
     pub struct NodeGraphExample {
@@ -465,7 +465,11 @@ mod egui_node_graph {
             node_id: NodeId,
         }
         impl<'a> Evaluator<'a> {
-            fn new(graph: &'a MyGraph, outputs_cache: &'a mut OutputsCache, node_id: NodeId) -> Self {
+            fn new(
+                graph: &'a MyGraph,
+                outputs_cache: &'a mut OutputsCache,
+                node_id: NodeId,
+            ) -> Self {
                 Self {
                     graph,
                     outputs_cache,
@@ -503,7 +507,11 @@ mod egui_node_graph {
             fn input_scalar(&mut self, name: &str) -> anyhow::Result<f32> {
                 self.evaluate_input(name)?.try_to_scalar()
             }
-            fn output_vector(&mut self, name: &str, value: egui::Vec2) -> anyhow::Result<MyValueType> {
+            fn output_vector(
+                &mut self,
+                name: &str,
+                value: egui::Vec2,
+            ) -> anyhow::Result<MyValueType> {
                 self.populate_output(name, MyValueType::Vec2 { value })
             }
             fn output_scalar(&mut self, name: &str, value: f32) -> anyhow::Result<MyValueType> {
@@ -596,25 +604,26 @@ mod egui_node_graph {
             Ok(graph[input_id].value)
         }
     }
+}
 
-    #[cfg(not(target_arch = "wasm32"))]
-    fn main() {
-        use eframe::egui::Visuals;
+#[cfg(all(not(target_arch = "wasm32"), feature = "egui_node_graph_use"))]
+fn main() {
+    use eframe::egui::Visuals;
+    use egui_node_graph::NodeGraph;
 
-        eframe::run_native(
-            "Egui node graph example",
-            eframe::NativeOptions::default(),
-            Box::new(|cc| {
-                cc.egui_ctx.set_visuals(Visuals::dark());
-                #[cfg(feature = "persistence")]
-                {
-                    Box::new(NodeGraphExample::new(cc))
-                }
-                #[cfg(not(feature = "persistence"))]
-                Box::<NodeGraphExample>::default()
-            }),
-        );
-    }
+    eframe::run_native(
+        "Egui node graph example",
+        eframe::NativeOptions::default(),
+        Box::new(|cc| {
+            cc.egui_ctx.set_visuals(Visuals::dark());
+            #[cfg(feature = "persistence")]
+            {
+                Box::new(NodeGraphExample::new(cc))
+            }
+            #[cfg(not(feature = "persistence"))]
+            Box::<NodeGraphExample>::default()
+        }),
+    );
 }
 
 #[cfg(not(feature = "egui_node_graph_use"))]
