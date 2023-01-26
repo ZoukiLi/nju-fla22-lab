@@ -11,7 +11,7 @@ struct Point {
     point: (f64, f64),
 }
 
-/// a little
+/// a little test for state
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 struct State {
     name: String,

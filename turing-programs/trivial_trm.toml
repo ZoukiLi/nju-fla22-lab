@@ -1,23 +1,23 @@
 [[state]]
 name = 'A'
-is_start = true
+start = true
 
 [[state.transitions]]
 next = 'B'
-consume = 'b'
-produce = ' '
-move = 'Left'
+cons = 'b'
+prod = ' '
+move = 'L'
 
 [[state.transitions]]
 next = 'C'
-consume = '*'
-produce = '*'
-move = 'Stay'
+cons = '*'
+prod = '*'
+move = 'S'
 
 [[state]]
 name = 'B'
-is_final = false
+final = false
 
 [[state]]
 name = 'C'
-is_final = true
+final = true
