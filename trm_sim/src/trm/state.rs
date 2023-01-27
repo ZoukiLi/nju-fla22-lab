@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// the direction to move
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Direction {
     Left,
     Right,
@@ -12,7 +12,7 @@ pub enum Direction {
 
 /// a turing machine state
 #[derive(Debug, Clone)]
-pub struct State<'a> {
+pub struct State {
     /// the name of the state
     name: String,
     /// is this state the start state
@@ -20,7 +20,7 @@ pub struct State<'a> {
     /// is this state a final state
     is_final: bool,
     /// the transitions of the state
-    transitions: Vec<Transition<'a>>,
+    transitions: Vec<Transition>,
 }
 
 /// a helper struct for serde state
@@ -42,7 +42,7 @@ pub struct StateSerde {
 
 /// a turing machine transition
 #[derive(Debug, Clone)]
-pub struct Transition<'a> {
+pub struct Transition {
     /// the symbols to consume
     consume: Vec<char>,
     /// the symbols to produce
@@ -50,7 +50,7 @@ pub struct Transition<'a> {
     /// the direction to move
     direction: Vec<Direction>,
     /// the next state
-    next_state: Option<&'a State<'a>>,
+    next_state_name: String,
 }
 
 /// a helper struct for serde transition
@@ -73,56 +73,90 @@ pub struct TransitionSerde {
 /// error type for syntax errors
 #[derive(Debug, Clone)]
 pub enum SyntaxErrorType {
-    /// the state name is not found
-    StateNameNotFound,
-    /// the transition consume symbol is not found
-    TransitionConsumeSymbolNotFound,
-    /// the transition produce symbol is not found
-    TransitionProduceSymbolNotFound,
+    /// the transition consume symbol is not match produce symbol
+    TransitionConsumeProduceNotMatch,
     /// the transition direction is not found
     TransitionDirectionNotFound,
-    /// the transition next state is not found
-    TransitionNextStateNotFound,
 }
 
 /// error struct for syntax errors
 #[derive(Debug, Clone)]
 pub struct SyntaxError {
     /// the type of the error
-    error_type: SyntaxErrorType,
+    pub error_type: SyntaxErrorType,
     /// the error message
-    message: String,
+    pub message: String,
 }
 
-impl<'a> Transition<'a> {
-    /// create new transition from serde transition
-    pub fn from_serde(trans: TransitionSerde, states: &Vec<State>) -> Result<Self, SyntaxError> {
+impl StateSerde {
+    /// into state with syntax check
+    pub fn into_state(self) -> Result<State, SyntaxError> {
+        let transitions = self
+            .trans
+            .into_iter()
+            .map(|t| t.into_transition())
+            .collect::<Result<_, _>>()?;
 
+        Ok(State {
+            name: self.name,
+            is_start: self.is_start,
+            is_final: self.is_final,
+            transitions,
+        })
+    }
+
+    /// create serializable state from state reference
+    pub fn from_state(state: &State) -> Self {
+        Self {
+            name: state.name.clone(),
+            is_start: state.is_start,
+            is_final: state.is_final,
+            trans: state
+                .transitions
+                .iter()
+                .map(TransitionSerde::from_transition)
+                .collect(),
+        }
+    }
+}
+
+impl Transition {
+    /// create new transition from serde transition
+    pub fn from_serde(trans: TransitionSerde) -> Result<Self, SyntaxError> {
+        trans.into_transition()
+    }
+
+    /// get serde transition
+    pub fn to_serde(&self) -> TransitionSerde {
+        TransitionSerde::from_transition(self)
     }
 }
 
 impl TransitionSerde {
-    pub fn into_transition(self, states: &Vec<State>) -> Result<Transition, SyntaxError> {
-
-    }
-
-    /// get next state by name
-    fn get_next_state(&self, states: &Vec<State>) -> Result<&State, SyntaxError> {
-        let next_state = states.iter()
-            .find(|s|s.name == self.next_state_name);
-        match next_state {
-            Some(s) => Ok(s),
-            None => Err(SyntaxError {
-                error_type: SyntaxErrorType::TransitionNextStateNotFound,
-                message: format!("Transition `{}` -> `{}` next state named `{}` not found",
-                    self.consume, self.produce, self.next_state_name),
-            }),
+    /// into transition with syntax check
+    pub fn into_transition(self) -> Result<Transition, SyntaxError> {
+        let (consume, produce) = self.get_consume_produce()?;
+        let direction = self.get_direction()?;
+        if direction.len() != consume.len() {
+            return Err(SyntaxError {
+                error_type: SyntaxErrorType::TransitionConsumeProduceNotMatch,
+                message: format!(
+                    "Transition `{}` -> `{}` consume do not match move direction `{}`",
+                    self.consume, self.produce, self.next_direction
+                ),
+            });
         }
+        Ok(Transition {
+            consume,
+            produce,
+            direction,
+            next_state_name: self.next_state_name,
+        })
     }
 
-    /// get next directions
-    fn get_next_direction(&self) -> Result<Vec<Direction>, SyntaxError> {
-        let next_direction = self.next_direction
+    /// get move directions
+    fn get_direction(&self) -> Result<Vec<Direction>, SyntaxError> {
+        self.next_direction
             .to_uppercase()
             .chars()
             .map(|c| match c {
@@ -131,26 +165,46 @@ impl TransitionSerde {
                 'S' => Ok(Direction::Stay),
                 _ => Err(SyntaxError {
                     error_type: SyntaxErrorType::TransitionDirectionNotFound,
-                    message: format!("Transition `{}` -> `{}` direction `{}` not found",
-                        self.consume, self.produce, c),
+                    message: format!(
+                        "Transition `{}` -> `{}` direction `{}` not found",
+                        self.consume, self.produce, c
+                    ),
                 }),
             })
-            .collect::<Result<Vec<Direction>, SyntaxError>>();
-        next_direction
+            .collect()
     }
 
-    /// create new transition from serde transition
+    /// get pair of consume and produce symbols
+    fn get_consume_produce(&self) -> Result<(Vec<char>, Vec<char>), SyntaxError> {
+        let consume = self.consume.chars().collect::<Vec<char>>();
+        let produce = self.produce.chars().collect::<Vec<char>>();
+        if consume.len() != produce.len() {
+            Err(SyntaxError {
+                error_type: SyntaxErrorType::TransitionConsumeProduceNotMatch,
+                message: format!(
+                    "Transition `{}` -> `{}` consume and produce symbols not match",
+                    self.consume, self.produce
+                ),
+            })
+        } else {
+            Ok((consume, produce))
+        }
+    }
+
+    /// create serializable transition from transition
     pub fn from_transition(transition: &Transition) -> Self {
         // get the direction from direction
-        let next_direction = transition.direction.iter()
+        let next_direction = transition
+            .direction
+            .iter()
             .map(|d| match d {
                 Direction::Left => 'L',
                 Direction::Right => 'R',
                 Direction::Stay => 'S',
             })
-            .collect::<String>();
+            .collect();
         // get the next state name
-        let next_state_name = transition.next_state.unwrap().name.clone();
+        let next_state_name = transition.next_state_name.clone();
         Self {
             consume: transition.consume.iter().collect(),
             produce: transition.produce.iter().collect(),

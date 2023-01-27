@@ -1,16 +1,17 @@
 //! This module contains the turing machine struct and its methods.
 
+use std::collections::HashMap;
 use super::tape::*;
 use super::state::*;
 use serde::{Deserialize, Serialize};
 
 /// a turing machine struct
 #[derive(Debug, Clone)]
-pub struct Machine<'a> {
+pub struct Machine {
     /// the states of the machine
-    states: Vec<State<'a>>,
-    /// the current state pointer
-    current_state: Option<&'a State<'a>>,
+    states: HashMap<String, State>,
+    /// the current state
+    current_state: String,
     /// the tapes of the machine
     tape: Vec<Tape>,
 }

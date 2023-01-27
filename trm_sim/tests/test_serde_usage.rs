@@ -35,7 +35,9 @@ struct Transition {
 
     #[serde(rename = "next")]
     next_state_name: String,
+    #[serde(rename = "cons")]
     consume: String,
+    #[serde(rename = "prod")]
     produce: String,
     #[serde(rename = "move")]
     move_direction: MoveDirection,
