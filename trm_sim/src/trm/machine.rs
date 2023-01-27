@@ -32,3 +32,21 @@ pub struct MachineIdentifier {
     /// current tape content
     tape: Vec<FrozenTape>,
 }
+
+impl Machine<'_> {
+    /// creates a new machine from a model
+    pub fn new(model: MachineModel) -> Result<Self, SyntaxError> {
+        // create states from model
+        let mut states: Vec<State> = model
+            .state
+            .into_iter()
+            .map(|s| s.into_state())
+            .collect();
+
+        Ok(Self {
+            states,
+            current_state: None,
+            tape: Vec::new(),
+        })
+    }
+}

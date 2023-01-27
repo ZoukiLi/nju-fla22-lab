@@ -12,7 +12,7 @@ pub enum Direction {
 
 /// a turing machine state
 #[derive(Debug, Clone)]
-pub struct State<'a> {
+pub(crate) struct State<'a> {
     /// the name of the state
     name: String,
     /// is this state the start state
@@ -21,6 +21,8 @@ pub struct State<'a> {
     is_final: bool,
     /// the transitions of the state
     transitions: Vec<Transition<'a>>,
+    /// the raw transitions
+    trans_raw: Option<Vec<TransitionSerde>>,
 }
 
 /// a helper struct for serde state
@@ -42,7 +44,7 @@ pub struct StateSerde {
 
 /// a turing machine transition
 #[derive(Debug, Clone)]
-pub struct Transition<'a> {
+pub(crate) struct Transition<'a> {
     /// the symbols to consume
     consume: Vec<char>,
     /// the symbols to produce
@@ -73,8 +75,6 @@ pub struct TransitionSerde {
 /// error type for syntax errors
 #[derive(Debug, Clone)]
 pub enum SyntaxErrorType {
-    /// the state name is not found
-    StateNameNotFound,
     /// the transition consume symbol is not match produce symbol
     TransitionConsumeProduceNotMatch,
     /// the transition direction is not found
@@ -90,6 +90,57 @@ pub struct SyntaxError {
     pub error_type: SyntaxErrorType,
     /// the error message
     pub message: String,
+}
+
+impl<'a> State<'a> {
+    /// create new state from serde state
+    pub fn from_serde(state: StateSerde) -> Self {
+        state.into_state()
+    }
+
+    /// get serde state
+    pub fn to_serde(&self) -> StateSerde {
+        StateSerde::from_state(self)
+    }
+
+    /// initialize the transitions
+    pub fn init_trans(&mut self, states: &'a [State<'a>]) -> Result<(), SyntaxError> {
+        self.transitions = self
+            .trans_raw
+            .take()
+            .unwrap()
+            .into_iter()
+            .map(|t| t.into_transition(states))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(())
+    }
+}
+
+impl StateSerde {
+    /// into state
+    pub(crate) fn into_state(self) -> State<'static> {
+        State {
+            name: self.name,
+            is_start: self.is_start,
+            is_final: self.is_final,
+            transitions: vec![],
+            trans_raw: Some(self.trans),
+        }
+    }
+    /// from state
+    pub(crate) fn from_state(state: &State) -> Self {
+        let trans = state
+            .transitions
+            .iter()
+            .map(TransitionSerde::from_transition)
+            .collect();
+        Self {
+            name: state.name.clone(),
+            is_start: state.is_start,
+            is_final: state.is_final,
+            trans,
+        }
+    }
 }
 
 impl<'a> Transition<'a> {
@@ -113,7 +164,10 @@ impl Drop for Transition<'_> {
 
 impl TransitionSerde {
     /// into transition
-    pub fn into_transition<'a>(self, states: &'a [State]) -> Result<Transition<'a>, SyntaxError> {
+    pub(crate) fn into_transition<'a>(
+        self,
+        states: &'a [State],
+    ) -> Result<Transition<'a>, SyntaxError> {
         let (consume, produce) = self.get_consume_produce()?;
         let direction = self.get_direction()?;
         let next_state = self.get_next_state(states)?;
@@ -127,21 +181,23 @@ impl TransitionSerde {
 
     /// get next state by name
     fn get_next_state<'a>(&'_ self, states: &'a [State<'a>]) -> Result<&'a State<'a>, SyntaxError> {
-        let next_state = states.iter()
-            .find(|s| s.name == self.next_state_name);
+        let next_state = states.iter().find(|s| s.name == self.next_state_name);
         match next_state {
             Some(s) => Ok(s),
             None => Err(SyntaxError {
                 error_type: SyntaxErrorType::TransitionNextStateNotFound,
-                message: format!("Transition `{}` -> `{}` next state named `{}` not found",
-                                 self.consume, self.produce, self.next_state_name),
+                message: format!(
+                    "Transition `{}` -> `{}` next state named `{}` not found",
+                    self.consume, self.produce, self.next_state_name
+                ),
             }),
         }
     }
 
     /// get move directions
     fn get_direction(&self) -> Result<Vec<Direction>, SyntaxError> {
-        let next_direction = self.next_direction
+        let next_direction = self
+            .next_direction
             .to_uppercase()
             .chars()
             .map(|c| match c {
@@ -150,8 +206,10 @@ impl TransitionSerde {
                 'S' => Ok(Direction::Stay),
                 _ => Err(SyntaxError {
                     error_type: SyntaxErrorType::TransitionDirectionNotFound,
-                    message: format!("Transition `{}` -> `{}` direction `{}` not found",
-                                     self.consume, self.produce, c),
+                    message: format!(
+                        "Transition `{}` -> `{}` direction `{}` not found",
+                        self.consume, self.produce, c
+                    ),
                 }),
             })
             .collect::<Result<Vec<Direction>, SyntaxError>>();
@@ -165,8 +223,10 @@ impl TransitionSerde {
         if consume.len() != produce.len() {
             Err(SyntaxError {
                 error_type: SyntaxErrorType::TransitionConsumeProduceNotMatch,
-                message: format!("Transition `{}` -> `{}` consume and produce symbols not match",
-                                 self.consume, self.produce),
+                message: format!(
+                    "Transition `{}` -> `{}` consume and produce symbols not match",
+                    self.consume, self.produce
+                ),
             })
         } else {
             Ok((consume, produce))
@@ -174,9 +234,11 @@ impl TransitionSerde {
     }
 
     /// create serializable transition from transition
-    pub fn from_transition(transition: &Transition) -> Self {
+    pub(crate) fn from_transition(transition: &Transition) -> Self {
         // get the direction from direction
-        let next_direction = transition.direction.iter()
+        let next_direction = transition
+            .direction
+            .iter()
             .map(|d| match d {
                 Direction::Left => 'L',
                 Direction::Right => 'R',
