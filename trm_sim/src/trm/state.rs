@@ -75,10 +75,8 @@ pub struct TransitionSerde {
 pub enum SyntaxErrorType {
     /// the state name is not found
     StateNameNotFound,
-    /// the transition consume symbol is not found
-    TransitionConsumeSymbolNotFound,
-    /// the transition produce symbol is not found
-    TransitionProduceSymbolNotFound,
+    /// the transition consume symbol is not match produce symbol
+    TransitionConsumeProduceNotMatch,
     /// the transition direction is not found
     TransitionDirectionNotFound,
     /// the transition next state is not found
@@ -89,39 +87,60 @@ pub enum SyntaxErrorType {
 #[derive(Debug, Clone)]
 pub struct SyntaxError {
     /// the type of the error
-    error_type: SyntaxErrorType,
+    pub error_type: SyntaxErrorType,
     /// the error message
-    message: String,
+    pub message: String,
 }
 
 impl<'a> Transition<'a> {
     /// create new transition from serde transition
-    pub fn from_serde(trans: TransitionSerde, states: &Vec<State>) -> Result<Self, SyntaxError> {
+    pub fn from_serde(trans: TransitionSerde, states: &'a [State]) -> Result<Self, SyntaxError> {
+        trans.into_transition(states)
+    }
 
+    /// get serde transition
+    pub fn to_serde(&self) -> TransitionSerde {
+        TransitionSerde::from_transition(self)
+    }
+}
+
+impl Drop for Transition<'_> {
+    /// drop skip next state
+    fn drop(&mut self) {
+        self.next_state = None;
     }
 }
 
 impl TransitionSerde {
-    pub fn into_transition(self, states: &Vec<State>) -> Result<Transition, SyntaxError> {
-
+    /// into transition
+    pub fn into_transition<'a>(self, states: &'a [State]) -> Result<Transition<'a>, SyntaxError> {
+        let (consume, produce) = self.get_consume_produce()?;
+        let direction = self.get_direction()?;
+        let next_state = self.get_next_state(states)?;
+        Ok(Transition {
+            consume,
+            produce,
+            direction,
+            next_state: Some(next_state),
+        })
     }
 
     /// get next state by name
-    fn get_next_state(&self, states: &Vec<State>) -> Result<&State, SyntaxError> {
+    fn get_next_state<'a>(&'_ self, states: &'a [State<'a>]) -> Result<&'a State<'a>, SyntaxError> {
         let next_state = states.iter()
-            .find(|s|s.name == self.next_state_name);
+            .find(|s| s.name == self.next_state_name);
         match next_state {
             Some(s) => Ok(s),
             None => Err(SyntaxError {
                 error_type: SyntaxErrorType::TransitionNextStateNotFound,
                 message: format!("Transition `{}` -> `{}` next state named `{}` not found",
-                    self.consume, self.produce, self.next_state_name),
+                                 self.consume, self.produce, self.next_state_name),
             }),
         }
     }
 
-    /// get next directions
-    fn get_next_direction(&self) -> Result<Vec<Direction>, SyntaxError> {
+    /// get move directions
+    fn get_direction(&self) -> Result<Vec<Direction>, SyntaxError> {
         let next_direction = self.next_direction
             .to_uppercase()
             .chars()
@@ -132,14 +151,29 @@ impl TransitionSerde {
                 _ => Err(SyntaxError {
                     error_type: SyntaxErrorType::TransitionDirectionNotFound,
                     message: format!("Transition `{}` -> `{}` direction `{}` not found",
-                        self.consume, self.produce, c),
+                                     self.consume, self.produce, c),
                 }),
             })
             .collect::<Result<Vec<Direction>, SyntaxError>>();
         next_direction
     }
 
-    /// create new transition from serde transition
+    /// get pair of consume and produce symbols
+    fn get_consume_produce(&self) -> Result<(Vec<char>, Vec<char>), SyntaxError> {
+        let consume = self.consume.chars().collect::<Vec<char>>();
+        let produce = self.produce.chars().collect::<Vec<char>>();
+        if consume.len() != produce.len() {
+            Err(SyntaxError {
+                error_type: SyntaxErrorType::TransitionConsumeProduceNotMatch,
+                message: format!("Transition `{}` -> `{}` consume and produce symbols not match",
+                                 self.consume, self.produce),
+            })
+        } else {
+            Ok((consume, produce))
+        }
+    }
+
+    /// create serializable transition from transition
     pub fn from_transition(transition: &Transition) -> Self {
         // get the direction from direction
         let next_direction = transition.direction.iter()

@@ -6,3 +6,5 @@ mod machine;
 mod state;
 
 pub use tape::*;
+pub use machine::*;
+pub use state::*;
