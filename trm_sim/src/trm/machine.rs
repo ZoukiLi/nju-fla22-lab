@@ -201,11 +201,10 @@ impl Machine {
         let state = self
             .states
             .get(&self.current_state)
-            .unwrap_or_else(|| panic!("current state not found: {}", self.current_state));
+            .ok_or(MachineRunningError::NextStateNotFound)?;
 
-        self.find_transition_index(state)
-            .map(|index| {
-                let t = &state.transitions[index];
+        Machine::find_transition(state, &self.tape, self.not_null_wc, self.null_wc)
+            .map(|t| {
                 // get next state
                 let next_state = self
                     .states
@@ -232,28 +231,31 @@ impl Machine {
     }
 
     /// find which transition to use
-    fn find_transition_index(&self, state: &State) -> Option<usize> {
+    fn find_transition<'a, 'b>(
+        state: &'a State,
+        tape: &'b [Tape],
+        some_wc: char,
+        null_wc: char,
+    ) -> Option<&'a Transition> {
         // get transition
         let match_all_tape = |rules: &[char]| {
             rules
                 .iter()
-                .zip(&self.tape)
-                .all(|(rule, tape)| tape.tape_match(*rule, self.not_null_wc, self.null_wc))
+                .zip(tape)
+                .all(|(rule, tape)| tape.tape_match(*rule, some_wc, null_wc))
         };
         let count_wc = |rules: &[char]| {
             rules
                 .iter()
-                .filter(|c| **c == self.not_null_wc || **c == self.null_wc)
+                .filter(|c| **c == some_wc || **c == null_wc)
                 .count()
         };
 
         state
             .transitions
             .iter()
-            .enumerate()
-            .filter(|(_, t)| match_all_tape(&t.consume))
-            .min_by_key(|(_, t)| count_wc(&t.consume))
-            .map(|(i, _)| i)
+            .filter(|t| match_all_tape(&t.consume))
+            .min_by_key(|t| count_wc(&t.consume))
     }
 
     /// check if the machine is in a final state
