@@ -1,6 +1,8 @@
 //! This module is for definition of turing machine state and transition structs.
 
 use serde::{Deserialize, Serialize};
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 
 /// the direction to move
 #[derive(Debug, Clone)]
@@ -14,13 +16,13 @@ pub enum Direction {
 #[derive(Debug, Clone)]
 pub struct State {
     /// the name of the state
-    name: String,
+    pub name: String,
     /// is this state the start state
-    is_start: bool,
+    pub is_start: bool,
     /// is this state a final state
-    is_final: bool,
+    pub is_final: bool,
     /// the transitions of the state
-    transitions: Vec<Transition>,
+    pub transitions: Vec<Transition>,
 }
 
 /// a helper struct for serde state
@@ -44,13 +46,13 @@ pub struct StateSerde {
 #[derive(Debug, Clone)]
 pub struct Transition {
     /// the symbols to consume
-    consume: Vec<char>,
+    pub consume: Vec<char>,
     /// the symbols to produce
-    produce: Vec<char>,
+    pub produce: Vec<char>,
     /// the direction to move
-    direction: Vec<Direction>,
+    pub direction: Vec<Direction>,
     /// the next state
-    next_state_name: String,
+    pub next_state_name: String,
 }
 
 /// a helper struct for serde transition
@@ -77,6 +79,14 @@ pub enum SyntaxErrorType {
     TransitionConsumeProduceNotMatch,
     /// the transition direction is not found
     TransitionDirectionNotFound,
+    /// the transition next state is not found
+    TransitionNextStateNotFound,
+    /// the syntax is not valid
+    SyntaxNotValid(String),
+    /// the format is not provided
+    FormatNotProvided,
+    /// start state is not found or more than one
+    StartStateError,
 }
 
 /// error struct for syntax errors
@@ -86,6 +96,26 @@ pub struct SyntaxError {
     pub error_type: SyntaxErrorType,
     /// the error message
     pub message: String,
+}
+
+impl Display for SyntaxError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#?}: {}", self.error_type, self.message)
+    }
+}
+
+impl Error for SyntaxError {}
+
+impl State {
+    /// create new state from StateSerde
+    pub fn from_serde(state: StateSerde) -> Result<Self, SyntaxError> {
+        state.into_state()
+    }
+
+    /// get StateSerde
+    pub fn to_serde(&self) -> StateSerde {
+        StateSerde::from_state(self)
+    }
 }
 
 impl StateSerde {

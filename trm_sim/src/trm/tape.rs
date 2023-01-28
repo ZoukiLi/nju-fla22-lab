@@ -96,6 +96,15 @@ impl Tape {
         }
     }
 
+    /// if this tape can match the given rule
+    pub fn tape_match(&self, rule: char, not_null_wc: char, null_wc: char) -> bool {
+        match rule {
+            c if c == null_wc => true,
+            c if c == not_null_wc => self.read().is_some(),
+            c => self.read() == Some(c),
+        }
+    }
+
     /// move the head left
     /// # Example
     /// ```
