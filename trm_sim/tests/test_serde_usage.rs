@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::rc::Weak;
+use std::vec;
 
 /// simple struct to test usage of serde crate
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -39,8 +40,8 @@ struct Transition {
     consume: String,
     #[serde(rename = "prod")]
     produce: String,
-    #[serde(rename = "move")]
-    move_direction: MoveDirection,
+    #[serde(rename = "move", deserialize_with = "deserialize_moves", serialize_with = "serialize_moves")]
+    move_direction: Vec<MoveDirection>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -48,6 +49,31 @@ enum MoveDirection {
     Left,
     Right,
     Stay,
+}
+
+fn deserialize_moves<'de, D>(deserializer: D) -> Result<Vec<MoveDirection>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: String = serde::Deserialize::deserialize(deserializer)?;
+    s.chars().map(|c| match c {
+        'L' => Ok(MoveDirection::Left),
+        'R' => Ok(MoveDirection::Right),
+        'S' => Ok(MoveDirection::Stay),
+        _ => Err(serde::de::Error::custom(format!("invalid move direction: {}", c))),
+    }).collect()
+}
+
+fn serialize_moves<S>(moves: &[MoveDirection], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let s: String = moves.iter().map(|m| match m {
+        MoveDirection::Left => 'L',
+        MoveDirection::Right => 'R',
+        MoveDirection::Stay => 'S',
+    }).collect();
+    serializer.serialize_str(&s)
 }
 
 /// simple test usage of serde crate
@@ -86,14 +112,14 @@ fn test_ser_state() {
                 next_state_name: String::from("B"),
                 consume: String::from("0"),
                 produce: String::from("1"),
-                move_direction: MoveDirection::Right,
+                move_direction: vec![MoveDirection::Right],
             },
             Transition {
                 next_state: None,
                 next_state_name: String::from("C"),
                 consume: String::from("1"),
                 produce: String::from("0"),
-                move_direction: MoveDirection::Left,
+                move_direction: vec![MoveDirection::Left],
             },
         ],
     };
@@ -145,14 +171,14 @@ fn test_ser_turing_machine() {
                 next_state_name: String::from("B"),
                 consume: String::from("0"),
                 produce: String::from("1"),
-                move_direction: MoveDirection::Right,
+                move_direction: vec![MoveDirection::Right],
             },
             Transition {
                 next_state: None,
                 next_state_name: String::from("C"),
                 consume: String::from("1"),
                 produce: String::from("0"),
-                move_direction: MoveDirection::Left,
+                move_direction: vec![MoveDirection::Left],
             },
         ],
     };

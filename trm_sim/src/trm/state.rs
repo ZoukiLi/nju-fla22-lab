@@ -5,7 +5,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 /// the direction to move
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum Direction {
     Left,
     Right,
@@ -59,13 +59,13 @@ pub struct Transition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransitionSerde {
     /// the symbols to consume
-    #[serde(alias = "cons")]
-    consume: String,
+    #[serde(alias = "consume")]
+    cons: String,
     /// the symbols to produce
-    #[serde(alias = "prod")]
-    produce: String,
+    #[serde(alias = "produce")]
+    prod: String,
     /// the direction to move
-    #[serde(rename = "next")]
+    #[serde(rename = "move")]
     next_direction: String,
     /// the next state
     #[serde(rename = "next")]
@@ -172,7 +172,7 @@ impl TransitionSerde {
                 error_type: SyntaxErrorType::TransitionConsumeProduceNotMatch,
                 message: format!(
                     "Transition `{}` -> `{}` consume do not match move direction `{}`",
-                    self.consume, self.produce, self.next_direction
+                    self.cons, self.prod, self.next_direction
                 ),
             });
         }
@@ -196,8 +196,8 @@ impl TransitionSerde {
                 _ => Err(SyntaxError {
                     error_type: SyntaxErrorType::TransitionDirectionNotFound,
                     message: format!(
-                        "Transition `{}` -> `{}` direction `{}` not found",
-                        self.consume, self.produce, c
+                        "Transition `{}` -> `{}` direction `{c}` not found",
+                        self.cons, self.prod
                     ),
                 }),
             })
@@ -206,14 +206,14 @@ impl TransitionSerde {
 
     /// get pair of consume and produce symbols
     fn get_consume_produce(&self) -> Result<(Vec<char>, Vec<char>), SyntaxError> {
-        let consume = self.consume.chars().collect::<Vec<char>>();
-        let produce = self.produce.chars().collect::<Vec<char>>();
+        let consume = self.cons.chars().collect::<Vec<char>>();
+        let produce = self.prod.chars().collect::<Vec<char>>();
         if consume.len() != produce.len() {
             Err(SyntaxError {
                 error_type: SyntaxErrorType::TransitionConsumeProduceNotMatch,
                 message: format!(
                     "Transition `{}` -> `{}` consume and produce symbols not match",
-                    self.consume, self.produce
+                    self.cons, self.prod
                 ),
             })
         } else {
@@ -236,8 +236,8 @@ impl TransitionSerde {
         // get the next state name
         let next_state_name = transition.next_state_name.clone();
         Self {
-            consume: transition.consume.iter().collect(),
-            produce: transition.produce.iter().collect(),
+            cons: transition.consume.iter().collect(),
+            prod: transition.produce.iter().collect(),
             next_direction,
             next_state_name,
         }

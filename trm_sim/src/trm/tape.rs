@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::ops::Range;
 
+use super::Direction;
+
 /// a tape is a vector of symbols with a head
 /// that can move left and right,
 /// the tape is infinite in both directions
@@ -152,6 +154,23 @@ impl Tape {
             self.tape.push_back(None);
         }
         self.head += 1;
+    }
+
+    /// move the head with given direction,
+    /// stays if the direction is `Stay`
+    /// # Example
+    /// ```
+    /// use trm_sim::trm::{Tape, Direction};
+    /// let mut tape = Tape::new("0101");
+    /// tape.move_to(Direction::Left);
+    /// assert_eq!(tape.read(), None);
+    /// ```
+    pub fn move_to(&mut self, dir: Direction) {
+        match dir {
+            Direction::Left => self.move_left(),
+            Direction::Right => self.move_right(),
+            Direction::Stay => (),
+        }
     }
 
     /// returns the tape's frozen version,

@@ -1,6 +1,6 @@
-//! Copy from https://github.com/setzer22/egui_node_graph/tree/main/egui_node_graph_example
+//! Copy from [egui_node_graph_example](https://github.com/setzer22/egui_node_graph/tree/main/egui_node_graph_example)
 
-#[cfg(feature = "egui_node_graph_use")]
+#[cfg(feature = "gui_node_graph")]
 mod egui_node_graph {
     use std::{borrow::Cow, collections::HashMap};
 
@@ -606,7 +606,7 @@ mod egui_node_graph {
     }
 }
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "egui_node_graph_use"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "gui_node_graph"))]
 fn main() {
     use eframe::egui::Visuals;
     use egui_node_graph::NodeGraph;
@@ -626,7 +626,7 @@ fn main() {
     );
 }
 
-#[cfg(not(feature = "egui_node_graph_use"))]
+#[cfg(not(feature = "gui_node_graph"))]
 fn main() {
     println!("This example requires the `egui_node_graph_use` feature to be enabled.");
 }

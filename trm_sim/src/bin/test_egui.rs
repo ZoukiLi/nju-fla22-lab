@@ -1,8 +1,8 @@
-//! test for egui crate
-//! do not compile this file
+//! Test for egui crate.
+//! Do not compile this file
 //! when feature "egui_use" is not enabled
 
-#[cfg(feature = "egui_use")]
+#[cfg(feature = "gui")]
 mod egui_test {
     use eframe::egui::Context;
     use eframe::{self, egui, Frame};
@@ -36,7 +36,7 @@ mod egui_test {
     }
 }
 
-#[cfg(feature = "egui_use")]
+#[cfg(feature = "gui")]
 fn main() {
     use egui_test::TestApp;
 
@@ -48,7 +48,7 @@ fn main() {
     )
 }
 
-#[cfg(not(feature = "egui_use"))]
+#[cfg(not(feature = "gui"))]
 fn main() {
     println!("feature \"egui_use\" is not enabled");
 }

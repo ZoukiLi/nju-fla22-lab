@@ -6,55 +6,64 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::iter::zip;
 
-/// a turing machine struct
+/// A turing machine struct
 /// # Example
 /// ```
+/// # fn test_run() -> Result<(), Box<dyn std::error::Error>> {
 /// use trm_sim::trm::Machine;
 /// let model = r#"
 /// {
-///     "states": [
-///         {
-///             "name": "q0",
-///             "start": true,
-///             "transitions": [
-///                 {
-///                     "cons": ["0"],
-///                     "pros": ["1"],
-///                     "dirs": ["R"],
-///                     "next": "q1"
-///                 },
-///                 {
-///                     "cons": ["1"],
-///                     "pros": ["0"],
-///                     "dirs": ["R"],
-///                     "next": "q1"
-///                 }
-///             ]
-///         },
-///         {
-///             "name": "q1",
-///             "final": true,
-///             "transitions": [
-///                 {
-///                     "cons": ["0"],
-///                     "pros": ["1"],
-///                     "dirs": ["R"],
-///                     "next": "q1"
-///                 },
-///                 {
-///                     "cons": ["1"],
-///                     "pros": ["0"],
-///                     "dirs": ["R"],
-///                     "next": "q1"
-///                 }
-///             ]
-///         }
-///     ]
+///     // the states of the machine ...
+/// #   "states": [
+/// #       {
+/// #           "name": "q0",
+/// #           "start": true,
+/// #           "transitions": [
+/// #               {
+/// #                   "cons": "0",
+/// #                   "prod": "1",
+/// #                   "move": "R",
+/// #                   "next": "q1"
+/// #               },
+/// #               {
+/// #                   "cons": "1",
+/// #                   "prod": "0",
+/// #                   "move": "R",
+/// #                   "next": "q1"
+/// #               }
+/// #           ]
+/// #       },
+/// #       {
+/// #           "name": "q1",
+/// #           "final": true,
+/// #           "transitions": [
+/// #               {
+/// #                   "cons": "0",
+/// #                   "prod": "1",
+/// #                   "move": "R",
+/// #                   "next": "q1"
+/// #               },
+/// #               {
+/// #                   "cons": "1",
+/// #                   "prod": "0",
+/// #                   "move": "R",
+/// #                   "next": "q1"
+/// #               }
+/// #           ]
+/// #       }
+/// #   ]
 /// }
 /// "#;
-/// let machine = Machine::new(model, "json")?;
-///
+/// let mut machine = Machine::new(model, "json")?;
+/// machine.input("1101");
+/// machine.run()?;
+/// let id = machine.identifier();
+/// assert_eq!(id.current_state, "q1");
+/// assert_eq!(id.tape[0].tape, "0101");
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct Machine {
@@ -78,25 +87,34 @@ pub struct Machine {
     blank: char,
 }
 
-/// a helper struct of machine model for serde
+/// A helper struct of machine model for serde
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MachineModel {
     /// the states of the machine
     #[serde(default, alias = "states")]
     state: Vec<StateSerde>,
+    /// wildcard for notnull char
+    #[serde(default, rename = "notNullWildcard")]
+    not_null_wc: Option<char>,
+    /// wildcard for nullable char
+    #[serde(default, rename = "nullWildcard")]
+    null_wc: Option<char>,
+    /// blank char
+    #[serde(default, rename = "blank")]
+    blank: Option<char>,
 }
 
-/// readonly identifier for one machine,
+/// Readonly identifier for one machine,
 /// which is also serializable
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MachineIdentifier {
     /// current state name
-    current_state: String,
+    pub current_state: String,
     /// current tape content
-    tape: Vec<FrozenTape>,
+    pub tape: Vec<FrozenTape>,
 }
 
-/// machine running error
+/// Machine running error
 #[derive(Debug, Clone)]
 pub enum MachineRunningError {
     /// the transition next state is not found
@@ -114,7 +132,7 @@ impl Display for MachineRunningError {
 impl Error for MachineRunningError {}
 
 impl Machine {
-    /// creates a new machine from a model,
+    /// Creates a new machine from a model,
     /// with given model format.
     /// # Arguments
     /// * `model` - the model of the machine
@@ -147,7 +165,7 @@ impl Machine {
         if start_state.len() != 1 {
             return Err(SyntaxError {
                 error_type: SyntaxErrorType::StartStateError,
-                message: format!("start state error: {:#?}", start_state),
+                message: format!("start state error: {start_state:#?}"),
             });
         }
 
@@ -158,14 +176,14 @@ impl Machine {
             current_state: start_state[0].clone(),
             tape: Vec::new(),
             tape_num: 0,
-            not_null_wc: '*',
-            null_wc: '_',
-            blank: ' ',
+            not_null_wc: model.not_null_wc.unwrap_or('*'),
+            null_wc: model.null_wc.unwrap_or('_'),
+            blank: model.blank.unwrap_or(' '),
         };
         Ok(machine)
     }
 
-    /// resets the machine to the start state,
+    /// Resets the machine to the start state,
     /// and clears the tapes.
     /// # Errors
     /// * `SyntaxError` - if the machine has no start state, or has more than one start state,
@@ -175,7 +193,7 @@ impl Machine {
     }
 
     /// returns the identifier of the machine
-    pub fn get_identifier(&self) -> MachineIdentifier {
+    pub fn identifier(&self) -> MachineIdentifier {
         MachineIdentifier {
             tape: self.tape.iter().map(|t| t.freeze(self.blank)).collect(),
             current_state: self.current_state.clone(),
@@ -195,8 +213,10 @@ impl Machine {
 
     /// runs the machine for one step
     /// # Errors
-    /// * `SyntaxError` - if one transition next state does not exist
-    pub fn run(&mut self) -> Result<bool, MachineRunningError> {
+    /// * `NextStateNotFound` - if one transition next state does not exist
+    /// # Returns
+    ///
+    pub fn run_once(&mut self) -> Result<bool, MachineRunningError> {
         // get current state
         let state = self
             .states
@@ -211,18 +231,20 @@ impl Machine {
                     .get(&t.next_state_name)
                     .ok_or(MachineRunningError::NextStateNotFound)?;
                 // write to tape
-                t.produce.iter().zip(&mut self.tape).for_each(|(p, tape)| {
-                    tape.write(*p);
-                });
+                zip(&t.consume, &t.produce)
+                    .zip(&mut self.tape)
+                    .for_each(|((c, p), tape)| {
+                        // if both consume char and produce char are wildcard,
+                        // then do nothing
+                        if *c != *p {
+                            tape.write(*p);
+                        }
+                    });
                 // move tape
                 t.direction
                     .iter()
                     .zip(&mut self.tape)
-                    .for_each(|(m, tape)| match *m {
-                        Direction::Left => tape.move_left(),
-                        Direction::Right => tape.move_right(),
-                        _ => {}
-                    });
+                    .for_each(|(m, tape)| tape.move_to(*m));
                 // set next state
                 self.current_state = next_state.name.clone();
                 Ok(false)
@@ -230,10 +252,23 @@ impl Machine {
             .unwrap_or(Ok(true))
     }
 
+    /// run until the machine stops
+    /// # Errors
+    /// * `NextStateNotFound` - if one transition next state does not exist
+    pub fn run(&mut self) -> Result<bool, MachineRunningError> {
+        loop {
+            if self.run_once()? {
+                break;
+            }
+        }
+        Ok(self.final_states.contains(&self.current_state))
+    }
+
+
     /// find which transition to use
-    fn find_transition<'a, 'b>(
+    fn find_transition<'a>(
         state: &'a State,
-        tape: &'b [Tape],
+        tape: &'_ [Tape],
         some_wc: char,
         null_wc: char,
     ) -> Option<&'a Transition> {
@@ -262,6 +297,17 @@ impl Machine {
     pub fn is_final(&self) -> bool {
         self.final_states.contains(&self.current_state)
     }
+
+    /// get the model of the machine
+    pub fn model(&self) -> MachineModel {
+        let states = self.states.values().map(|s| s.to_serde()).collect();
+        MachineModel {
+            state: states,
+            not_null_wc: Some(self.not_null_wc),
+            null_wc: Some(self.null_wc),
+            blank: Some(self.blank),
+        }
+    }
 }
 
 impl MachineModel {
@@ -285,7 +331,7 @@ impl MachineModel {
             _ => {
                 return Err(SyntaxError {
                     error_type: SyntaxErrorType::FormatNotProvided,
-                    message: format!("not provided format: {}", fmt),
+                    message: format!("not provided format: {fmt}"),
                 })
             }
         };
