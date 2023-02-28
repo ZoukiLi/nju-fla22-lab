@@ -40,7 +40,11 @@ struct Transition {
     consume: String,
     #[serde(rename = "prod")]
     produce: String,
-    #[serde(rename = "move", deserialize_with = "deserialize_moves", serialize_with = "serialize_moves")]
+    #[serde(
+        rename = "move",
+        deserialize_with = "deserialize_moves",
+        serialize_with = "serialize_moves"
+    )]
     move_direction: Vec<MoveDirection>,
 }
 
@@ -56,23 +60,31 @@ where
     D: serde::Deserializer<'de>,
 {
     let s: String = serde::Deserialize::deserialize(deserializer)?;
-    s.chars().map(|c| match c {
-        'L' => Ok(MoveDirection::Left),
-        'R' => Ok(MoveDirection::Right),
-        'S' => Ok(MoveDirection::Stay),
-        _ => Err(serde::de::Error::custom(format!("invalid move direction: {}", c))),
-    }).collect()
+    s.chars()
+        .map(|c| match c {
+            'L' => Ok(MoveDirection::Left),
+            'R' => Ok(MoveDirection::Right),
+            'S' => Ok(MoveDirection::Stay),
+            _ => Err(serde::de::Error::custom(format!(
+                "invalid move direction: {}",
+                c
+            ))),
+        })
+        .collect()
 }
 
 fn serialize_moves<S>(moves: &[MoveDirection], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    let s: String = moves.iter().map(|m| match m {
-        MoveDirection::Left => 'L',
-        MoveDirection::Right => 'R',
-        MoveDirection::Stay => 'S',
-    }).collect();
+    let s: String = moves
+        .iter()
+        .map(|m| match m {
+            MoveDirection::Left => 'L',
+            MoveDirection::Right => 'R',
+            MoveDirection::Stay => 'S',
+        })
+        .collect();
     serializer.serialize_str(&s)
 }
 

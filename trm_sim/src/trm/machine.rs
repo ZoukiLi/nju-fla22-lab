@@ -1,7 +1,10 @@
 //! This module contains the turing machine struct and its methods.
 
-use super::state::*;
-use super::tape::*;
+use crate::trm::machine_running_error::MachineRunningError;
+use crate::trm::{FrozenTape, Tape};
+use crate::trm::{Pattern, PatternAction, PatternConfig};
+use crate::trm::{State, StateSerde, Transition};
+use crate::trm::{SyntaxError, SyntaxErrorType};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -79,12 +82,8 @@ pub struct Machine {
     tape: Vec<Tape>,
     /// the number of tapes
     tape_num: usize,
-    /// wildcard for notnull char
-    not_null_wc: char,
-    /// wildcard for nullable char
-    null_wc: char,
-    /// blank char
-    blank: char,
+    /// config for pattern matching
+    pattern_config: PatternConfig,
 }
 
 /// A helper struct of machine model for serde
@@ -93,15 +92,9 @@ pub struct MachineModel {
     /// the states of the machine
     #[serde(default, alias = "states")]
     state: Vec<StateSerde>,
-    /// wildcard for notnull char
-    #[serde(default, rename = "notNullWildcard")]
-    not_null_wc: Option<char>,
-    /// wildcard for nullable char
-    #[serde(default, rename = "nullWildcard")]
-    null_wc: Option<char>,
-    /// blank char
-    #[serde(default, rename = "blank")]
-    blank: Option<char>,
+    /// config for pattern matching
+    #[serde(default, rename = "config")]
+    pattern_config: PatternConfig,
 }
 
 /// Readonly identifier for one machine,
@@ -113,23 +106,6 @@ pub struct MachineIdentifier {
     /// current tape content
     pub tape: Vec<FrozenTape>,
 }
-
-/// Machine running error
-#[derive(Debug, Clone)]
-pub enum MachineRunningError {
-    /// the transition next state is not found
-    NextStateNotFound,
-}
-
-impl Display for MachineRunningError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MachineRunningError::NextStateNotFound => write!(f, "Next state not found."),
-        }
-    }
-}
-
-impl Error for MachineRunningError {}
 
 impl Machine {
     /// Creates a new machine from a model,
@@ -176,9 +152,7 @@ impl Machine {
             current_state: start_state[0].clone(),
             tape: Vec::new(),
             tape_num: 0,
-            not_null_wc: model.not_null_wc.unwrap_or('*'),
-            null_wc: model.null_wc.unwrap_or('_'),
-            blank: model.blank.unwrap_or(' '),
+            pattern_config: model.pattern_config,
         };
         Ok(machine)
     }
@@ -264,21 +238,14 @@ impl Machine {
         Ok(self.final_states.contains(&self.current_state))
     }
 
-
     /// find which transition to use
-    fn find_transition<'a>(
+    fn find_state_transition<'a>(
         state: &'a State,
         tape: &'_ [Tape],
-        some_wc: char,
-        null_wc: char,
+        config: &'_ PatternConfig,
     ) -> Option<&'a Transition> {
         // get transition
-        let match_all_tape = |rules: &[char]| {
-            rules
-                .iter()
-                .zip(tape)
-                .all(|(rule, tape)| tape.tape_match(*rule, some_wc, null_wc))
-        };
+        let match_all_tape = |cons: &[char]| config.parse();
         let count_wc = |rules: &[char]| {
             rules
                 .iter()
@@ -303,9 +270,7 @@ impl Machine {
         let states = self.states.values().map(|s| s.to_serde()).collect();
         MachineModel {
             state: states,
-            not_null_wc: Some(self.not_null_wc),
-            null_wc: Some(self.null_wc),
-            blank: Some(self.blank),
+            pattern_config: self.pattern_config,
         }
     }
 }

@@ -66,5 +66,4 @@ next = 'q1'
     println!("{yaml_str}");
     println!("{tom_str}");
     println!("{json_str}");
-
 }
