@@ -189,6 +189,9 @@ impl Machine {
     /// # Errors
     /// * `NextStateNotFound` - if one transition next state does not exist
     /// # Returns
+    /// * `true` - if the machine is in a final state
+    /// * `false` - if the machine is not in a final state
+    ///
     ///
     pub fn run_once(&mut self) -> Result<bool, MachineRunningError> {
         // get current state
@@ -230,11 +233,7 @@ impl Machine {
     /// # Errors
     /// * `NextStateNotFound` - if one transition next state does not exist
     pub fn run(&mut self) -> Result<bool, MachineRunningError> {
-        loop {
-            if self.run_once()? {
-                break;
-            }
-        }
+        while !self.run_once()? {}
         Ok(self.final_states.contains(&self.current_state))
     }
 
