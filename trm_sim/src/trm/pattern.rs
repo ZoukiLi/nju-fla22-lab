@@ -84,8 +84,8 @@ impl Pattern for AnyPattern {
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct PatternConfig {
-    #[serde(rename = "null")]
-    pub null: char,
+    #[serde(rename = "empty")]
+    pub empty: char,
     #[serde(rename = "some")]
     pub some_wildcard: char,
     pub any: char,
@@ -94,7 +94,7 @@ pub struct PatternConfig {
 impl Default for PatternConfig {
     fn default() -> Self {
         Self {
-            null: '_',
+            empty: '_',
             some_wildcard: '*',
             any: '.',
         }
@@ -106,7 +106,7 @@ impl PatternConfig {
         pattern
             .iter()
             .map(|c| match *c {
-                c if c == self.null => Box::new(EmptyPattern) as Box<dyn Pattern>,
+                c if c == self.empty => Box::new(EmptyPattern) as Box<dyn Pattern>,
                 c if c == self.some_wildcard => Box::new(SomeWildcardPattern),
                 c if c == self.any => Box::new(AnyPattern),
                 c => Box::new(CharPattern { pattern: c }),

@@ -5,7 +5,7 @@ start = true
 [[state.transitions]]
 next = 'B'
 cons = 'b'
-prod = ' '
+prod = '_'
 move = 'L'
 
 [[state.transitions]]

@@ -166,7 +166,7 @@ impl Machine {
     /// returns the identifier of the machine
     pub fn identifier(&self) -> MachineIdentifier {
         MachineIdentifier {
-            tape: self.tape.iter().map(|t| t.freeze(self.pattern_config.null)).collect(),
+            tape: self.tape.iter().map(|t| t.freeze(self.pattern_config.empty)).collect(),
             current_state: self.current_state.clone(),
         }
     }
@@ -212,7 +212,7 @@ impl Machine {
                         match p.action(*cp.0, *cp.1) {
                             PatternAction::Keep => {}
                             PatternAction::Replace(r) => {
-                                if r == self.pattern_config.null {
+                                if r == self.pattern_config.empty {
                                     tape.write_blank();
                                 } else {
                                     tape.write(r);
