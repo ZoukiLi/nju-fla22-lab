@@ -48,7 +48,7 @@ impl Tape {
     /// let mut tape = Tape::new("0101");
     /// ```
     pub fn new(s: &str) -> Self {
-        let mut data: VecDeque<Option<char>> = s.chars().map(Some).collect();
+        let mut data: VecDeque<_> = s.chars().map(Some).collect();
         if data.is_empty() {
             data.push_back(None);
         }
@@ -95,6 +95,21 @@ impl Tape {
     pub fn write(&mut self, c: char) {
         if let Some(s) = self.tape.get_mut(self.head) {
             *s = Some(c);
+        }
+    }
+
+    /// write a blank symbol under the head
+    /// # Example
+    /// ```
+    /// use trm_sim::trm::Tape;
+    /// let mut tape = Tape::new("0101");
+    /// tape.write_blank();
+    /// assert_eq!(tape.read(), None);
+    /// ```
+    /// if the head is out of bounds, adds a new symbol
+    pub fn write_blank(&mut self) {
+        if let Some(s) = self.tape.get_mut(self.head) {
+            *s = None;
         }
     }
 

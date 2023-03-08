@@ -1,14 +1,12 @@
 //! This module contains the turing machine struct and its methods.
 
 use crate::trm::machine_running_error::MachineRunningError;
+use crate::trm::{PatternAction, PatternConfig};
 use crate::trm::{FrozenTape, Tape};
-use crate::trm::{Pattern, PatternAction, PatternConfig};
 use crate::trm::{State, StateSerde, Transition};
 use crate::trm::{SyntaxError, SyntaxErrorType};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::fmt::{Display, Formatter};
 use std::iter::zip;
 
 /// A turing machine struct
@@ -68,7 +66,6 @@ use std::iter::zip;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone)]
 pub struct Machine {
     /// the states of the machine
     states: HashMap<String, State>,
@@ -122,7 +119,7 @@ impl Machine {
         let states: HashMap<_, _> = model
             .state
             .into_iter()
-            .map(|state| state.into_state())
+            .map(|s| State::try_from_serde(s, model.pattern_config))
             .map(|state| state.map(|s| (s.name.clone(), s)))
             .collect::<Result<_, _>>()?;
         // filter start state and final states
@@ -169,7 +166,7 @@ impl Machine {
     /// returns the identifier of the machine
     pub fn identifier(&self) -> MachineIdentifier {
         MachineIdentifier {
-            tape: self.tape.iter().map(|t| t.freeze(self.blank)).collect(),
+            tape: self.tape.iter().map(|t| t.freeze(self.pattern_config.null)).collect(),
             current_state: self.current_state.clone(),
         }
     }
@@ -200,7 +197,7 @@ impl Machine {
             .get(&self.current_state)
             .ok_or(MachineRunningError::NextStateNotFound)?;
 
-        Machine::find_transition(state, &self.tape, self.not_null_wc, self.null_wc)
+        Machine::find_state_transition(state, &self.tape)
             .map(|t| {
                 // get next state
                 let next_state = self
@@ -210,11 +207,17 @@ impl Machine {
                 // write to tape
                 zip(&t.consume, &t.produce)
                     .zip(&mut self.tape)
-                    .for_each(|((c, p), tape)| {
-                        // if both consume char and produce char are wildcard,
-                        // then do nothing
-                        if *c != *p {
-                            tape.write(*p);
+                    .zip(&t.consume_pattern)
+                    .for_each(|((cp, tape), p)| {
+                        match p.action(*cp.0, *cp.1) {
+                            PatternAction::Keep => {}
+                            PatternAction::Replace(r) => {
+                                if r == self.pattern_config.null {
+                                    tape.write_blank();
+                                } else {
+                                    tape.write(r);
+                                }
+                            }
                         }
                     });
                 // move tape
@@ -237,26 +240,18 @@ impl Machine {
         Ok(self.final_states.contains(&self.current_state))
     }
 
-    /// find which transition to use
-    fn find_state_transition<'a>(
-        state: &'a State,
-        tape: &'_ [Tape],
-        config: &'_ PatternConfig,
-    ) -> Option<&'a Transition> {
-        // get transition
-        let match_all_tape = |cons: &[char]| config.parse();
-        let count_wc = |rules: &[char]| {
-            rules
-                .iter()
-                .filter(|c| **c == some_wc || **c == null_wc)
-                .count()
-        };
-
+    /// find which transition to use in current pattern config
+    fn find_state_transition<'a>(state: &'a State, tape: &'_ [Tape]) -> Option<&'a Transition> {
+        // filter transitions that match tapes heads
         state
             .transitions
             .iter()
-            .filter(|t| match_all_tape(&t.consume))
-            .min_by_key(|t| count_wc(&t.consume))
+            .find(|t| {
+                t.consume_pattern
+                    .iter()
+                    .zip(tape)
+                    .all(|(p, t)| p.match_input(t.read()))
+            })
     }
 
     /// check if the machine is in a final state

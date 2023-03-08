@@ -1,12 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+use crate::trm::{Pattern, PatternConfig};
+
 use crate::trm::syntax_error::{SyntaxError, SyntaxErrorType};
 
 /// a turing machine transition
-#[derive(Debug, Clone)]
 pub struct Transition {
     /// the symbols to consume
     pub consume: Vec<char>,
+    /// the pattern to consume
+    pub consume_pattern: Vec<Box<dyn Pattern>>,
     /// the symbols to produce
     pub produce: Vec<char>,
     /// the direction to move
@@ -34,8 +37,11 @@ pub struct TransitionSerde {
 
 impl Transition {
     /// create new transition from serde transition
-    pub fn from_serde(trans: TransitionSerde) -> Result<Self, SyntaxError> {
-        trans.into_transition()
+    pub fn try_from_serde(
+        trans: TransitionSerde,
+        config: PatternConfig,
+    ) -> Result<Self, SyntaxError> {
+        trans.into_transition(config)
     }
 
     /// get serde transition
@@ -46,8 +52,9 @@ impl Transition {
 
 impl TransitionSerde {
     /// into transition with syntax check
-    pub fn into_transition(self) -> Result<Transition, SyntaxError> {
+    pub fn into_transition(self, config: PatternConfig) -> Result<Transition, SyntaxError> {
         let (consume, produce) = self.get_consume_produce()?;
+        let consume_pattern = config.parse(&consume);
         let direction = self.get_direction()?;
         if direction.len() != consume.len() {
             return Err(SyntaxError {
@@ -60,6 +67,7 @@ impl TransitionSerde {
         }
         Ok(Transition {
             consume,
+            consume_pattern,
             produce,
             direction,
             next_state_name: self.next_state_name,

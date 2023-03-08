@@ -21,7 +21,7 @@ impl PatternAction {
 pub trait Pattern {
     fn match_input(&self, input: Option<char>) -> bool;
 
-    fn action(&self, cons_prod: (char, char), cur: Option<char>) -> PatternAction;
+    fn action(&self, cons: char, prod: char) -> PatternAction;
 }
 
 #[derive(Debug, Clone)]
@@ -34,9 +34,9 @@ impl Pattern for CharPattern {
         input == Some(self.pattern)
     }
 
-    fn action(&self, cons_prod: (char, char), _cur: Option<char>) -> PatternAction {
+    fn action(&self, _cons: char, prod: char) -> PatternAction {
         // always replace
-        PatternAction::new(false, cons_prod.1)
+        PatternAction::new(false, prod)
     }
 }
 
@@ -48,9 +48,9 @@ impl Pattern for EmptyPattern {
         input.is_none()
     }
 
-    fn action(&self, cons_prod: (char, char), _cur: Option<char>) -> PatternAction {
+    fn action(&self, cons: char, prod: char) -> PatternAction {
         // keep if cons == prod
-        PatternAction::new(cons_prod.0 == cons_prod.1, cons_prod.1)
+        PatternAction::new(cons == prod, prod)
     }
 }
 
@@ -62,9 +62,9 @@ impl Pattern for SomeWildcardPattern {
         input.is_some()
     }
 
-    fn action(&self, cons_prod: (char, char), _cur: Option<char>) -> PatternAction {
+    fn action(&self, cons: char, prod: char) -> PatternAction {
         // keep if cons == prod
-        PatternAction::new(cons_prod.0 == cons_prod.1, cons_prod.1)
+        PatternAction::new(cons == prod, prod)
     }
 }
 
@@ -76,15 +76,16 @@ impl Pattern for AnyPattern {
         true
     }
 
-    fn action(&self, cons_prod: (char, char), _cur: Option<char>) -> PatternAction {
+    fn action(&self, cons: char, prod: char) -> PatternAction {
         // keep if cons == prod
-        PatternAction::new(cons_prod.0 == cons_prod.1, cons_prod.1)
+        PatternAction::new(cons == prod, prod)
     }
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct PatternConfig {
-    pub empty: char,
+    #[serde(rename = "null")]
+    pub null: char,
     #[serde(rename = "some")]
     pub some_wildcard: char,
     pub any: char,
@@ -93,7 +94,7 @@ pub struct PatternConfig {
 impl Default for PatternConfig {
     fn default() -> Self {
         Self {
-            empty: '_',
+            null: '_',
             some_wildcard: '*',
             any: '.',
         }
@@ -101,11 +102,11 @@ impl Default for PatternConfig {
 }
 
 impl PatternConfig {
-    pub fn parse(&self, pattern: &str) -> Vec<Box<dyn Pattern>> {
+    pub fn parse(&self, pattern: &[char]) -> Vec<Box<dyn Pattern>> {
         pattern
-            .chars()
-            .map(|c| match c {
-                c if c == self.empty => Box::new(EmptyPattern) as Box<dyn Pattern>,
+            .iter()
+            .map(|c| match *c {
+                c if c == self.null => Box::new(EmptyPattern) as Box<dyn Pattern>,
                 c if c == self.some_wildcard => Box::new(SomeWildcardPattern),
                 c if c == self.any => Box::new(AnyPattern),
                 c => Box::new(CharPattern { pattern: c }),

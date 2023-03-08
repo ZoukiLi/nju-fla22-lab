@@ -56,7 +56,7 @@
 //! next = "q0"
 //! [[state.trans]]
 //! cons = "_"
-//! prod = " "
+//! prod = "_"
 //! move = "L"
 //! next = "q1"
 //!

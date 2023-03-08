@@ -2,10 +2,10 @@
 
 use crate::trm::syntax_error::SyntaxError;
 use crate::trm::transition::{Transition, TransitionSerde};
+use crate::trm::PatternConfig;
 use serde::{Deserialize, Serialize};
 
 /// a turing machine state
-#[derive(Debug, Clone)]
 pub struct State {
     /// the name of the state
     pub name: String,
@@ -36,8 +36,8 @@ pub struct StateSerde {
 
 impl State {
     /// create new state from StateSerde
-    pub fn from_serde(state: StateSerde) -> Result<Self, SyntaxError> {
-        state.into_state()
+    pub fn try_from_serde(state: StateSerde, config: PatternConfig) -> Result<Self, SyntaxError> {
+        state.into_state(config)
     }
 
     /// get StateSerde
@@ -48,11 +48,11 @@ impl State {
 
 impl StateSerde {
     /// into state with syntax check
-    pub fn into_state(self) -> Result<State, SyntaxError> {
+    pub fn into_state(self, config: PatternConfig) -> Result<State, SyntaxError> {
         let transitions = self
             .trans
             .into_iter()
-            .map(|t| t.into_transition())
+            .map(|t| t.into_transition(config))
             .collect::<Result<_, _>>()?;
 
         Ok(State {
