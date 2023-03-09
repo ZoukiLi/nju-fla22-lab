@@ -180,15 +180,16 @@ impl Tape {
     }
 
     /// returns the tape's frozen version,
-    /// removing the empty symbol and None on the tape.
+    /// removing None on the tape.
+    /// But replacing them with the given empty symbol if needed.
     /// # Example
     /// ```
     /// use trm_sim::trm::Tape;
-    /// let mut tape = Tape::new(" 0101 ");
-    /// let frozen = tape.freeze(' ');
-    /// assert_eq!(frozen.tape, " 0101");
-    /// assert_eq!(frozen.head, 0);
-    /// assert_eq!(frozen.range, 0..5);
+    /// let mut tape = Tape::new("0101");
+    /// tape.move_left();
+    /// let frozen = tape.freeze('_');
+    /// assert_eq!(frozen.tape, "_0101");
+    /// assert_eq!(frozen.head, -1);
     /// ```
     pub fn freeze(&self, empty: char) -> FrozenTape {
         // get the first non-empty symbol before head
@@ -196,14 +197,14 @@ impl Tape {
             .tape
             .iter()
             .take(self.head)
-            .position(|o| o.map(|c| c != empty).unwrap_or(false))
+            .position(Option::is_some)
             .unwrap_or(self.head);
         // get the last non-empty symbol after head
         let end = self
             .tape
             .iter()
             .skip(self.head + 1)
-            .rposition(|o| o.map(|c| c != empty).unwrap_or(false))
+            .rposition(Option::is_some)
             .map_or(self.head, |i| i + self.head + 1);
         // get the non-empty symbols
         let tape: String = self
@@ -211,7 +212,7 @@ impl Tape {
             .iter()
             .skip(start)
             .take(end - start + 1)
-            .filter_map(|o| *o)
+            .map(|o| o.unwrap_or(empty))
             .collect();
         // get the outside index of head
         let head = self.head as isize + self.offset;

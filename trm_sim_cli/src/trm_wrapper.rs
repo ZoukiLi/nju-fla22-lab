@@ -9,7 +9,8 @@ pub struct MachineWrapper<Formatter: MachineIdentifierFormatter> {
 impl MachineWrapper<DefaultMachineIdentifierFormatter> {
     pub fn from_file(path: &str, ext: Option<&str>) -> Result<Self, String> {
         let ext = ext.or(path.split('.').last()).ok_or("No extension provided")?;
-        let trm = trm::Machine::new(path, ext).map_err(|e| e.to_string())?;
+        let model_str = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        let trm = trm::Machine::new(&model_str, ext).map_err(|e| e.to_string())?;
         Ok(Self { trm, formatter: DefaultMachineIdentifierFormatter })
     }
 
