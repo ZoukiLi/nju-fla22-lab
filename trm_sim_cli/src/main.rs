@@ -1,3 +1,3 @@
 fn main() {
-    println!("Hello, world!");
+    trm_sim_cli::run();
 }
